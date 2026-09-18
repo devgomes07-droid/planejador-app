@@ -141,21 +141,30 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
         <button onClick={goToPreviousMonth}>◀</button>
         <button onClick={goToToday}>Hoje</button>
         <button onClick={goToNextMonth}>▶</button>
-        <strong>
+        <strong style={{ color: 'var(--color-text-primary)' }}>
           {MONTH_NAMES[currentMonth]} {currentYear}
         </strong>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
         {WEEKDAY_HEADERS.map((day) => (
-          <div key={day} style={{ textAlign: 'center', fontWeight: 'bold', padding: 4 }}>
+          <div
+            key={day}
+            style={{
+              textAlign: 'center',
+              fontWeight: 500,
+              padding: 4,
+              color: 'var(--color-text-secondary)',
+              fontSize: 13,
+            }}
+          >
             {day}
           </div>
         ))}
 
         {grid.map((date, index) => {
           if (!date) {
-            return <div key={index} style={{ minHeight: 80 }} />;
+            return <div key={index} style={{ minHeight: 84 }} />;
           }
 
           const dateStr = formatDate(date);
@@ -174,19 +183,32 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
                 onSelectDay?.(dateStr);
               }}
               style={{
-                minHeight: 80,
-                border: isToday ? '2px solid #4a90d9' : '1px solid #ddd',
-                backgroundColor: isSelected ? '#eef5ff' : 'white',
-                borderRadius: 6,
-                padding: 6,
+                minHeight: 84,
+                border: isToday
+                  ? '2px solid var(--color-primary)'
+                  : '1px solid var(--color-border)',
+                backgroundColor: isSelected ? 'var(--color-primary-light)' : 'var(--color-surface)',
+                borderRadius: 'var(--radius-md)',
+                padding: 8,
                 cursor: 'pointer',
                 fontSize: 13,
+                boxShadow: 'var(--shadow-card)',
+                transition: 'background-color 0.15s ease',
               }}
             >
-              <div style={{ fontWeight: isToday ? 'bold' : 'normal' }}>{date.getDate()}</div>
+              <div
+                style={{
+                  fontWeight: isToday ? 600 : 400,
+                  color: isToday ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                }}
+              >
+                {date.getDate()}
+              </div>
 
               {activeActivities.length === 0 && (
-                <div style={{ color: '#bbb', fontSize: 11, marginTop: 4 }}>Livre</div>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 11, marginTop: 4 }}>
+                  Livre
+                </div>
               )}
 
               {highlight && (
@@ -197,6 +219,7 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    color: 'var(--color-text-primary)',
                   }}
                 >
                   {highlight.title}
@@ -204,7 +227,9 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
               )}
 
               {extraCount > 0 && (
-                <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>+{extraCount}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                  +{extraCount}
+                </div>
               )}
             </div>
           );

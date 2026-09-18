@@ -7,18 +7,26 @@ import './App.css';
 function App() {
   const [view, setView] = useState<'monthly' | 'weekly' | 'pending'>('monthly');
 
-  return (
-    <div>
-      <h1 style={{ textAlign: 'center' }}>Planejador</h1>
+  const navButtonStyle = (active: boolean) => ({
+    backgroundColor: active ? 'var(--color-primary)' : 'var(--color-surface)',
+    color: active ? '#fff' : 'var(--color-text-primary)',
+    borderColor: active ? 'var(--color-primary)' : 'var(--color-border)',
+  });
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 20 }}>
-        <button onClick={() => setView('monthly')} disabled={view === 'monthly'}>
+  return (
+    <div style={{ minHeight: '100vh' }}>
+      <h1 style={{ textAlign: 'center', color: 'var(--color-text-primary)', paddingTop: 24 }}>
+        Planejador
+      </h1>
+
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 24 }}>
+        <button style={navButtonStyle(view === 'monthly')} onClick={() => setView('monthly')}>
           Mensal
         </button>
-        <button onClick={() => setView('weekly')} disabled={view === 'weekly'}>
+        <button style={navButtonStyle(view === 'weekly')} onClick={() => setView('weekly')}>
           Semanal
         </button>
-        <button onClick={() => setView('pending')} disabled={view === 'pending'}>
+        <button style={navButtonStyle(view === 'pending')} onClick={() => setView('pending')}>
           Pendências
         </button>
       </div>

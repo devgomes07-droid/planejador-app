@@ -1,0 +1,87 @@
+:root {
+  --color-primary: #4a6fa5;
+  --color-primary-dark: #375580;
+  --color-primary-light: #cfdaeb;
+
+  --color-bg: #e8ebf0;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f6f7fa;
+
+  --color-text-primary: #2b2d33;
+  --color-text-secondary: #6b6f76;
+  --color-text-muted: #9a9ea5;
+
+  --color-border: #d8dce3;
+  --color-border-strong: var(--color-primary);
+
+  --color-success: #4c7a4a;
+  --color-danger: #b5544a;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --shadow-card: 0 2px 6px rgba(43, 45, 51, 0.08);
+  --shadow-card-hover: 0 4px 10px rgba(43, 45, 51, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  min-height: 100vh;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 14px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--shadow-card);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-card-hover);
+}
+
+button:disabled {
+  background-color: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+  cursor: default;
+}
+
+input[type='text'],
+input[type='date'],
+input[type='time'],
+select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
