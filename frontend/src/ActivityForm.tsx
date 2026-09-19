@@ -178,6 +178,14 @@ function ActivityForm({
         body: JSON.stringify(body),
       });
 
+      if (response.status === 409) {
+        setFormError(
+          'Este horário já está ocupado por outra atividade. Escolha outro horário e tente de novo.'
+        );
+        setSaving(false);
+        return;
+      }
+
       if (!response.ok) throw new Error('Erro ao salvar atividade');
 
       notify(isEditing ? 'Atividade atualizada.' : 'Atividade criada.', 'success');
