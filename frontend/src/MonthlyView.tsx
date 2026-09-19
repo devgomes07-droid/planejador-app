@@ -1,15 +1,7 @@
 import { useEffect, useState } from 'react';
-
-interface Activity {
-  id: number;
-  title: string;
-  date: string;
-  startTime: string | null;
-  type: string;
-  status: string;
-  priority: string | null;
-  highlighted: boolean;
-}
+import { formatDate } from './dateUtils';
+import { API_URL, USER_ID } from './api';
+import ActivityForm, { type Activity } from './ActivityForm';
 
 const WEEKDAY_HEADERS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const MONTH_NAMES = [
@@ -17,12 +9,24 @@ const MONTH_NAMES = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
-function formatDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Pendente',
+  IN_PROGRESS: 'Em andamento',
+  COMPLETED: 'Concluído',
+  CANCELLED: 'Cancelado',
+  POSTPONED: 'Adiado',
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  TASK: 'Tarefa',
+  COMMITMENT: 'Compromisso',
+  POSSIBILITY: 'Possibilidade',
+};
+
+type FormState =
+  | { mode: 'new'; date: string }
+  | { mode: 'edit'; activity: Activity }
+  | null;
 
 function pickHighlight(dayActivities: Activity[]): Activity | null {
   const active = dayActivities.filter((a) => a.status !== 'CANCELLED');
@@ -44,6 +48,22 @@ function pickHighlight(dayActivities: Activity[]): Activity | null {
   return active[0];
 }
 
+function formatLongDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const text = new Date(y, m - 1, d).toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function timeLabel(activity: Activity): string | null {
+  if (!activity.startTime) return null;
+  const start = activity.startTime.slice(0, 5);
+  return activity.endTime ? `${start}–${activity.endTime.slice(0, 5)}` : start;
+}
+
 interface MonthlyViewProps {
   onSelectDay?: (date: string) => void;
 }
@@ -56,6 +76,9 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [panelDay, setPanelDay] = useState<string | null>(null);
+  const [formState, setFormState] = useState<FormState>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
   const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
@@ -67,7 +90,9 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
     const startDate = formatDate(firstDayOfMonth);
     const endDate = formatDate(lastDayOfMonth);
 
-    fetch(`http://localhost:8080/api/activities?userId=1&startDate=${startDate}&endDate=${endDate}`)
+    fetch(
+      `${API_URL}/api/activities?userId=${USER_ID}&startDate=${startDate}&endDate=${endDate}`
+    )
       .then((response) => {
         if (!response.ok) throw new Error('Erro ao buscar atividades');
         return response.json();
@@ -80,7 +105,7 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
         setError(err.message);
         setLoading(false);
       });
-  }, [currentMonth, currentYear]);
+  }, [currentMonth, currentYear, reloadKey]);
 
   function goToPreviousMonth() {
     if (currentMonth === 0) {
@@ -109,6 +134,26 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
     return activities.filter((a) => a.date === dateStr);
   }
 
+  function getSortedDayActivities(dateStr: string): Activity[] {
+    const dayActivities = getActivitiesForDay(dateStr);
+    const withTime = dayActivities
+      .filter((a) => a.startTime)
+      .sort((a, b) => (a.startTime! < b.startTime! ? -1 : 1));
+    const withoutTime = dayActivities.filter((a) => !a.startTime);
+    return [...withTime, ...withoutTime];
+  }
+
+  function openDay(dateStr: string) {
+    setSelectedDay(dateStr);
+    setPanelDay(dateStr);
+    onSelectDay?.(dateStr);
+  }
+
+  function handleSaved() {
+    setFormState(null);
+    setReloadKey((k) => k + 1);
+  }
+
   function buildCalendarGrid(): (Date | null)[] {
     const firstWeekday = firstDayOfMonth.getDay();
     const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
@@ -129,42 +174,45 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
     return grid;
   }
 
-  if (loading) return <p>Carregando mês...</p>;
   if (error) return <p>Erro: {error}</p>;
 
   const grid = buildCalendarGrid();
   const todayStr = formatDate(today);
+  const panelActivities = panelDay ? getSortedDayActivities(panelDay) : [];
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <button onClick={goToPreviousMonth}>◀</button>
-        <button onClick={goToToday}>Hoje</button>
-        <button onClick={goToNextMonth}>▶</button>
+    <div className="app-container">
+      <div className="toolbar">
+        <div className="btn-group">
+          <button className="btn-icon" onClick={goToPreviousMonth} aria-label="Mês anterior">
+            ◀
+          </button>
+          <button onClick={goToToday}>Hoje</button>
+          <button className="btn-icon" onClick={goToNextMonth} aria-label="Próximo mês">
+            ▶
+          </button>
+        </div>
         <strong style={{ color: 'var(--color-text-primary)' }}>
           {MONTH_NAMES[currentMonth]} {currentYear}
         </strong>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+      {loading && (
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: '0 0 12px 0' }}>
+          Carregando mês...
+        </p>
+      )}
+
+      <div className="calendar-grid">
         {WEEKDAY_HEADERS.map((day) => (
-          <div
-            key={day}
-            style={{
-              textAlign: 'center',
-              fontWeight: 500,
-              padding: 4,
-              color: 'var(--color-text-secondary)',
-              fontSize: 13,
-            }}
-          >
+          <div key={day} className="calendar-weekday-header">
             {day}
           </div>
         ))}
 
         {grid.map((date, index) => {
           if (!date) {
-            return <div key={index} style={{ minHeight: 84 }} />;
+            return <div key={index} className="calendar-day" />;
           }
 
           const dateStr = formatDate(date);
@@ -178,20 +226,23 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
           return (
             <div
               key={dateStr}
-              onClick={() => {
-                setSelectedDay(dateStr);
-                onSelectDay?.(dateStr);
+              className="calendar-day"
+              role="button"
+              tabIndex={0}
+              onClick={() => openDay(dateStr)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openDay(dateStr);
+                }
               }}
               style={{
-                minHeight: 84,
                 border: isToday
                   ? '2px solid var(--color-primary)'
                   : '1px solid var(--color-border)',
                 backgroundColor: isSelected ? 'var(--color-primary-light)' : 'var(--color-surface)',
                 borderRadius: 'var(--radius-md)',
-                padding: 8,
                 cursor: 'pointer',
-                fontSize: 13,
                 boxShadow: 'var(--shadow-card)',
                 transition: 'background-color 0.15s ease',
               }}
@@ -215,7 +266,6 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
                 <div
                   style={{
                     marginTop: 4,
-                    fontSize: 12,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -235,6 +285,99 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
           );
         })}
       </div>
+
+      {panelDay && (
+        <div className="modal-overlay" onClick={() => setPanelDay(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>{formatLongDate(panelDay)}</h2>
+
+            {panelActivities.length === 0 && (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: 14, margin: '0 0 16px 0' }}>
+                Nenhuma atividade neste dia.
+              </p>
+            )}
+
+            {panelActivities.map((activity) => {
+              const label = timeLabel(activity);
+              const struck = activity.status === 'COMPLETED' || activity.status === 'CANCELLED';
+
+              return (
+                <div
+                  key={activity.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 0',
+                    borderBottom: '1px solid var(--color-surface-alt)',
+                    opacity: activity.status === 'CANCELLED' ? 0.5 : 1,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        textDecoration: struck ? 'line-through' : 'none',
+                        color:
+                          activity.status === 'COMPLETED'
+                            ? 'var(--color-text-muted)'
+                            : 'var(--color-text-primary)',
+                        fontWeight: activity.highlighted ? 600 : 400,
+                      }}
+                    >
+                      {label ? `${label} — ${activity.title}` : activity.title}
+                      {activity.type === 'POSSIBILITY' && (
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            fontSize: 11,
+                            padding: '2px 6px',
+                            border: '1px dashed var(--color-text-muted)',
+                            borderRadius: 'var(--radius-sm)',
+                            color: 'var(--color-text-secondary)',
+                          }}
+                        >
+                          Possível
+                        </span>
+                      )}
+                    </div>
+                    <small style={{ color: 'var(--color-text-secondary)' }}>
+                      {TYPE_LABELS[activity.type]} · {STATUS_LABELS[activity.status]}
+                    </small>
+                  </div>
+                  <button
+                    className="btn-small"
+                    onClick={() => setFormState({ mode: 'edit', activity })}
+                  >
+                    Editar
+                  </button>
+                </div>
+              );
+            })}
+
+            <div className="form-actions" style={{ marginTop: 16 }}>
+              <button className="btn-ghost" onClick={() => setPanelDay(null)}>
+                Fechar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => setFormState({ mode: 'new', date: panelDay })}
+              >
+                + Nova atividade
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {formState && (
+        <ActivityForm
+          activity={formState.mode === 'edit' ? formState.activity : null}
+          defaultDate={formState.mode === 'new' ? formState.date : formState.activity.date}
+          existingActivities={activities}
+          onSaved={handleSaved}
+          onClose={() => setFormState(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,17 +1,8 @@
 import { useEffect, useState } from 'react';
-
-interface Activity {
-  id: number;
-  title: string;
-  description: string | null;
-  date: string;
-  startTime: string | null;
-  endTime: string | null;
-  type: string;
-  status: string;
-  priority: string | null;
-  highlighted: boolean;
-}
+import { formatDate } from './dateUtils';
+import { API_URL, USER_ID } from './api';
+import ActivityForm, { type Activity } from './ActivityForm';
+import { useDialog } from './DialogProvider';
 
 const DAYS_OF_WEEK = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 
@@ -22,10 +13,6 @@ function getMondayOfWeek(date: Date): Date {
   monday.setDate(date.getDate() + diff);
   monday.setHours(0, 0, 0, 0);
   return monday;
-}
-
-function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
 }
 
 function formatDisplayDate(date: Date): string {
@@ -46,11 +33,34 @@ const STATUS_LABELS: Record<string, string> = {
   POSTPONED: 'Adiado',
 };
 
+const PRIORITY_LABELS: Record<string, string> = {
+  LOW: 'Baixa',
+  MEDIUM: 'Média',
+  HIGH: 'Alta',
+  URGENT: 'Urgente',
+};
+
+const PRIORITY_ORDER: Record<string, number> = {
+  URGENT: 0,
+  HIGH: 1,
+  MEDIUM: 2,
+  LOW: 3,
+};
+
+type FormState =
+  | { mode: 'new'; date: string }
+  | { mode: 'edit'; activity: Activity }
+  | null;
+
 function WeeklyView() {
+  const { notify } = useDialog();
   const [weekStart, setWeekStart] = useState(() => getMondayOfWeek(new Date()));
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [formState, setFormState] = useState<FormState>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
@@ -62,7 +72,9 @@ function WeeklyView() {
     const startDate = formatDate(weekStart);
     const endDate = formatDate(weekEnd);
 
-    fetch(`http://localhost:8080/api/activities?userId=1&startDate=${startDate}&endDate=${endDate}`)
+    fetch(
+      `${API_URL}/api/activities?userId=${USER_ID}&startDate=${startDate}&endDate=${endDate}`
+    )
       .then((response) => {
         if (!response.ok) throw new Error('Erro ao buscar atividades');
         return response.json();
@@ -75,7 +87,7 @@ function WeeklyView() {
         setError(err.message);
         setLoading(false);
       });
-  }, [weekStart]);
+  }, [weekStart, reloadKey]);
 
   function goToPreviousWeek() {
     const newStart = new Date(weekStart);
@@ -94,11 +106,14 @@ function WeeklyView() {
   }
 
   async function toggleComplete(activity: Activity) {
+    if (togglingId !== null) return;
+
     const newStatus = activity.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
+    setTogglingId(activity.id);
 
     try {
       const response = await fetch(
-        `http://localhost:8080/api/activities/${activity.id}/status?userId=1`,
+        `${API_URL}/api/activities/${activity.id}/status?userId=${USER_ID}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -111,11 +126,21 @@ function WeeklyView() {
       const updated: Activity = await response.json();
       setActivities((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
     } catch (err) {
-      alert('Não conseguimos atualizar esta atividade. Verifique sua conexão e tente novamente.');
+      notify(
+        'Não conseguimos atualizar esta atividade. Verifique sua conexão e tente novamente.',
+        'error'
+      );
+    } finally {
+      setTogglingId(null);
     }
   }
 
-  function getActivitiesForDay(date: Date): Activity[] {
+  function handleSaved() {
+    setFormState(null);
+    setReloadKey((k) => k + 1);
+  }
+
+  function getDayActivities(date: Date): { withTime: Activity[]; withoutTime: Activity[] } {
     const dateStr = formatDate(date);
     const dayActivities = activities.filter((a) => a.date === dateStr);
 
@@ -123,107 +148,197 @@ function WeeklyView() {
       .filter((a) => a.startTime)
       .sort((a, b) => (a.startTime! < b.startTime! ? -1 : 1));
 
-    const withoutTime = dayActivities.filter((a) => !a.startTime);
+    const withoutTime = dayActivities
+      .filter((a) => !a.startTime)
+      .sort((a, b) => {
+        const pa = a.priority ? PRIORITY_ORDER[a.priority] : 99;
+        const pb = b.priority ? PRIORITY_ORDER[b.priority] : 99;
+        if (pa !== pb) return pa - pb;
+        return a.id - b.id;
+      });
 
-    return [...withTime, ...withoutTime];
+    return { withTime, withoutTime };
   }
 
-  if (loading) return <p>Carregando semana...</p>;
+  function renderActivity(activity: Activity) {
+    const timeLabel = activity.startTime
+      ? activity.endTime
+        ? `${activity.startTime.slice(0, 5)}–${activity.endTime.slice(0, 5)}`
+        : activity.startTime.slice(0, 5)
+      : null;
+
+    return (
+      <div
+        key={activity.id}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '8px 0',
+          borderBottom: '1px solid var(--color-surface-alt)',
+          opacity: activity.status === 'CANCELLED' ? 0.5 : 1,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={activity.status === 'COMPLETED'}
+          disabled={togglingId === activity.id}
+          onChange={() => toggleComplete(activity)}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span
+            style={{
+              textDecoration:
+                activity.status === 'COMPLETED' || activity.status === 'CANCELLED'
+                  ? 'line-through'
+                  : 'none',
+              color:
+                activity.status === 'COMPLETED'
+                  ? 'var(--color-text-muted)'
+                  : 'var(--color-text-primary)',
+              fontWeight: activity.highlighted ? 600 : 400,
+            }}
+          >
+            {timeLabel ? `${timeLabel} — ${activity.title}` : activity.title}
+          </span>
+          {activity.type === 'POSSIBILITY' && (
+            <span
+              style={{
+                marginLeft: 8,
+                fontSize: 11,
+                padding: '2px 6px',
+                border: '1px dashed var(--color-text-muted)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              Possível
+            </span>
+          )}
+          <br />
+          <small style={{ color: 'var(--color-text-secondary)' }}>
+            {TYPE_LABELS[activity.type]} · {STATUS_LABELS[activity.status]}
+            {activity.priority ? ` · Prioridade ${PRIORITY_LABELS[activity.priority]}` : ''}
+          </small>
+        </div>
+        <button
+          className="btn-small"
+          onClick={() => setFormState({ mode: 'edit', activity })}
+        >
+          Editar
+        </button>
+      </div>
+    );
+  }
+
   if (error) return <p>Erro: {error}</p>;
 
+  const todayStr = formatDate(new Date());
+
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <button onClick={goToPreviousWeek}>◀ Anterior</button>
-        <button onClick={goToToday}>Hoje</button>
-        <button onClick={goToNextWeek}>Próxima ▶</button>
-        <strong>
+    <div className="app-container">
+      <div className="toolbar">
+        <div className="btn-group">
+          <button className="btn-icon" onClick={goToPreviousWeek} aria-label="Semana anterior">
+            ◀
+          </button>
+          <button onClick={goToToday}>Hoje</button>
+          <button className="btn-icon" onClick={goToNextWeek} aria-label="Próxima semana">
+            ▶
+          </button>
+        </div>
+        <strong style={{ color: 'var(--color-text-primary)' }}>
           {formatDisplayDate(weekStart)} — {formatDisplayDate(weekEnd)}
         </strong>
+        <div className="spacer">
+          <button
+            className="btn-primary"
+            onClick={() => setFormState({ mode: 'new', date: todayStr })}
+          >
+            + Nova atividade
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {loading && (
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: '0 0 12px 0' }}>
+          Carregando semana...
+        </p>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {DAYS_OF_WEEK.map((dayName, index) => {
           const dayDate = new Date(weekStart);
           dayDate.setDate(weekStart.getDate() + index);
-          const dayActivities = getActivitiesForDay(dayDate);
-          const isToday = formatDate(dayDate) === formatDate(new Date());
+          const dayStr = formatDate(dayDate);
+          const { withTime, withoutTime } = getDayActivities(dayDate);
+          const isToday = dayStr === todayStr;
+          const isEmpty = withTime.length === 0 && withoutTime.length === 0;
 
           return (
             <div
               key={dayName}
               style={{
-                border: isToday ? '2px solid #4a90d9' : '1px solid #ddd',
-                borderRadius: 8,
-                padding: 12,
+                border: isToday
+                  ? '2px solid var(--color-primary)'
+                  : '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                padding: 14,
+                backgroundColor: 'var(--color-surface)',
+                boxShadow: 'var(--shadow-card)',
               }}
             >
-              <h3 style={{ margin: '0 0 8px 0' }}>
-                {dayName.toUpperCase()} — {formatDisplayDate(dayDate)}
-                {isToday && ' (hoje)'}
-              </h3>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <h3 style={{ margin: 0, color: 'var(--color-text-primary)', fontSize: 15 }}>
+                  {dayName.toUpperCase()} — {formatDisplayDate(dayDate)}
+                  {isToday && (
+                    <span style={{ color: 'var(--color-primary)', fontWeight: 400 }}> (hoje)</span>
+                  )}
+                </h3>
+                <button
+                  className="btn-small btn-ghost"
+                  onClick={() => setFormState({ mode: 'new', date: dayStr })}
+                >
+                  + Adicionar
+                </button>
+              </div>
 
-              {dayActivities.length === 0 && (
-                <p style={{ color: '#999', fontSize: 14 }}>Nenhuma atividade</p>
+              {isEmpty && (
+                <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: 0 }}>
+                  Nenhuma atividade
+                </p>
               )}
 
-              {dayActivities.map((activity) => (
-                <div
-                  key={activity.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '6px 0',
-                    borderBottom: '1px solid #f0f0f0',
-                    opacity: activity.status === 'CANCELLED' ? 0.5 : 1,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={activity.status === 'COMPLETED'}
-                    onChange={() => toggleComplete(activity)}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <span
-                      style={{
-                        textDecoration:
-                          activity.status === 'COMPLETED' ? 'line-through' : 'none',
-                        fontWeight: activity.highlighted ? 'bold' : 'normal',
-                      }}
-                    >
-                      {activity.startTime
-                        ? `${activity.startTime.slice(0, 5)} — ${activity.title}`
-                        : activity.title}
-                    </span>
-                    {activity.type === 'POSSIBILITY' && (
-                      <span
-                        style={{
-                          marginLeft: 8,
-                          fontSize: 11,
-                          padding: '2px 6px',
-                          border: '1px dashed #999',
-                          borderRadius: 4,
-                          color: '#777',
-                        }}
-                      >
-                        Possível
-                      </span>
-                    )}
-                    <br />
-                    <small style={{ color: '#888' }}>
-                      {TYPE_LABELS[activity.type]} · {STATUS_LABELS[activity.status]}
-                    </small>
-                  </div>
-                </div>
-              ))}
+              {withTime.map(renderActivity)}
 
-              {dayActivities.filter((a) => !a.startTime).length === 0 &&
-                dayActivities.length > 0 && null}
+              {withoutTime.length > 0 && (
+                <>
+                  <div className="section-label">Sem horário definido</div>
+                  {withoutTime.map(renderActivity)}
+                </>
+              )}
             </div>
           );
         })}
       </div>
+
+      {formState && (
+        <ActivityForm
+          activity={formState.mode === 'edit' ? formState.activity : null}
+          defaultDate={formState.mode === 'new' ? formState.date : formState.activity.date}
+          existingActivities={activities}
+          onSaved={handleSaved}
+          onClose={() => setFormState(null)}
+        />
+      )}
     </div>
   );
 }
