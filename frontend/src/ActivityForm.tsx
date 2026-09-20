@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { API_URL, USER_ID } from './api';
+import { apiFetch } from './api';
 import { todayString } from './dateUtils';
 import { useDialog } from './DialogProvider';
 
@@ -44,7 +44,6 @@ function fromMinutes(total: number): string {
   return `${h}:${m}`;
 }
 
-// Todos os horários de 05:00 até 23:30, de 30 em 30 minutos
 const TIME_SLOTS: string[] = [];
 for (let minutes = 5 * 60; minutes <= 23 * 60 + 30; minutes += 30) {
   TIME_SLOTS.push(fromMinutes(minutes));
@@ -81,7 +80,6 @@ function ActivityForm({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Horário de fim calculado a partir da duração escolhida
   function computeEnd(): string {
     if (!hasTime || !startTime) return '';
     if (durationMode === 'none') return '';
@@ -92,7 +90,6 @@ function ActivityForm({
 
   const endTime = computeEnd();
 
-  // Horários ocupados no dia escolhido (ignora canceladas e a própria atividade)
   const busyActivities = existingActivities
     .filter((other) => {
       if (isEditing && other.id === activity!.id) return false;
@@ -102,7 +99,6 @@ function ActivityForm({
     })
     .sort((a, b) => (a.startTime! < b.startTime! ? -1 : 1));
 
-  // Um horário da grade está ocupado se cai dentro de outra atividade
   function isSlotBusy(slot: string): boolean {
     const s = toMinutes(slot);
     return busyActivities.some((other) => {
@@ -112,7 +108,6 @@ function ActivityForm({
     });
   }
 
-  // Sobreposição: sem horário de fim, a atividade ocupa só o minuto de início
   const conflicts: Activity[] =
     hasTime && startTime
       ? busyActivities.filter((other) => {
@@ -155,7 +150,6 @@ function ActivityForm({
     setSaving(true);
 
     const body = {
-      userId: USER_ID,
       title: title.trim(),
       description: description.trim() || null,
       date,
@@ -167,14 +161,11 @@ function ActivityForm({
       highlighted,
     };
 
-    const url = isEditing
-      ? `${API_URL}/api/activities/${activity!.id}?userId=${USER_ID}`
-      : `${API_URL}/api/activities?userId=${USER_ID}`;
+    const path = isEditing ? `/api/activities/${activity!.id}` : '/api/activities';
 
     try {
-      const response = await fetch(url, {
+      const response = await apiFetch(path, {
         method: isEditing ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
 
@@ -209,14 +200,10 @@ function ActivityForm({
 
     setSaving(true);
     try {
-      const response = await fetch(
-        `${API_URL}/api/activities/${activity.id}/status?userId=${USER_ID}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'CANCELLED' }),
-        }
-      );
+      const response = await apiFetch(`/api/activities/${activity.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'CANCELLED' }),
+      });
 
       if (!response.ok) throw new Error('Erro ao cancelar atividade');
 
@@ -242,10 +229,7 @@ function ActivityForm({
 
     setSaving(true);
     try {
-      const response = await fetch(
-        `${API_URL}/api/activities/${activity.id}?userId=${USER_ID}`,
-        { method: 'DELETE' }
-      );
+      const response = await apiFetch(`/api/activities/${activity.id}`, { method: 'DELETE' });
 
       if (!response.ok) throw new Error('Erro ao excluir atividade');
 

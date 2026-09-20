@@ -4,6 +4,7 @@ import com.seuprojeto.backend.dto.ActivityRequest;
 import com.seuprojeto.backend.dto.ActivityResponse;
 import com.seuprojeto.backend.dto.StatusUpdateRequest;
 import com.seuprojeto.backend.entity.Activity;
+import com.seuprojeto.backend.security.CurrentUser;
 import com.seuprojeto.backend.service.ActivityService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -26,10 +27,11 @@ public class ActivityController {
 
     @GetMapping
     public ResponseEntity<List<ActivityResponse>> list(
-            @RequestParam Long userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
+        Long userId = CurrentUser.getUserId();
+
         List<Activity> activities = (startDate != null && endDate != null)
                 ? activityService.findByPeriod(userId, startDate, endDate)
                 : activityService.findAllByUser(userId);
@@ -42,13 +44,14 @@ public class ActivityController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ActivityResponse> getById(@PathVariable Long id, @RequestParam Long userId) {
-        Activity activity = activityService.findByIdAndUser(id, userId);
+    public ResponseEntity<ActivityResponse> getById(@PathVariable Long id) {
+        Activity activity = activityService.findByIdAndUser(id, CurrentUser.getUserId());
         return ResponseEntity.ok(ActivityResponse.fromEntity(activity));
     }
 
     @PostMapping
     public ResponseEntity<ActivityResponse> create(@Valid @RequestBody ActivityRequest request) {
+        request.setUserId(CurrentUser.getUserId());
         Activity created = activityService.create(request);
         return ResponseEntity.ok(ActivityResponse.fromEntity(created));
     }
@@ -56,26 +59,24 @@ public class ActivityController {
     @PutMapping("/{id}")
     public ResponseEntity<ActivityResponse> update(
             @PathVariable Long id,
-            @RequestParam Long userId,
             @Valid @RequestBody ActivityRequest request
     ) {
-        Activity updated = activityService.update(id, userId, request);
+        Activity updated = activityService.update(id, CurrentUser.getUserId(), request);
         return ResponseEntity.ok(ActivityResponse.fromEntity(updated));
     }
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<ActivityResponse> updateStatus(
             @PathVariable Long id,
-            @RequestParam Long userId,
             @Valid @RequestBody StatusUpdateRequest request
     ) {
-        Activity updated = activityService.updateStatus(id, userId, request.getStatus());
+        Activity updated = activityService.updateStatus(id, CurrentUser.getUserId(), request.getStatus());
         return ResponseEntity.ok(ActivityResponse.fromEntity(updated));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id, @RequestParam Long userId) {
-        activityService.delete(id, userId);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        activityService.delete(id, CurrentUser.getUserId());
         return ResponseEntity.noContent().build();
     }
 }

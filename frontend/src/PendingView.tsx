@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { todayString } from './dateUtils';
-import { API_URL, USER_ID } from './api';
+import { apiFetch } from './api';
 import { useDialog } from './DialogProvider';
 
 interface PendingItem {
@@ -26,7 +26,7 @@ function PendingView() {
   function loadItems() {
     setLoading(true);
     setError(null);
-    fetch(`${API_URL}/api/pending-items?userId=${USER_ID}`)
+    apiFetch('/api/pending-items')
       .then((res) => {
         if (!res.ok) throw new Error('Erro ao buscar pendências');
         return res.json();
@@ -50,10 +50,9 @@ function PendingView() {
     setBusy(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/pending-items`, {
+      const response = await apiFetch('/api/pending-items', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: USER_ID, title: newTitle }),
+        body: JSON.stringify({ title: newTitle }),
       });
 
       if (!response.ok) throw new Error('Erro ao criar pendência');
@@ -76,14 +75,10 @@ function PendingView() {
     setBusy(true);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/pending-items/${id}/status?userId=${USER_ID}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'COMPLETED' }),
-        }
-      );
+      const response = await apiFetch(`/api/pending-items/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'COMPLETED' }),
+      });
 
       if (!response.ok) throw new Error('Erro ao atualizar pendência');
 
@@ -114,10 +109,7 @@ function PendingView() {
     setBusy(true);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/pending-items/${item.id}?userId=${USER_ID}`,
-        { method: 'DELETE' }
-      );
+      const response = await apiFetch(`/api/pending-items/${item.id}`, { method: 'DELETE' });
 
       if (!response.ok) throw new Error('Erro ao excluir pendência');
 
@@ -156,18 +148,14 @@ function PendingView() {
     setBusy(true);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/pending-items/${convertingId}/convert?userId=${USER_ID}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            date: convertDate,
-            startTime: convertStartTime ? `${convertStartTime}:00` : null,
-            type: convertType,
-          }),
-        }
-      );
+      const response = await apiFetch(`/api/pending-items/${convertingId}/convert`, {
+        method: 'POST',
+        body: JSON.stringify({
+          date: convertDate,
+          startTime: convertStartTime ? `${convertStartTime}:00` : null,
+          type: convertType,
+        }),
+      });
 
       if (response.status === 409) {
         notify(

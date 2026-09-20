@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatDate } from './dateUtils';
-import { API_URL, USER_ID } from './api';
+import { apiFetch } from './api';
 import ActivityForm, { type Activity } from './ActivityForm';
 import { useDialog } from './DialogProvider';
 
@@ -72,9 +72,7 @@ function WeeklyView() {
     const startDate = formatDate(weekStart);
     const endDate = formatDate(weekEnd);
 
-    fetch(
-      `${API_URL}/api/activities?userId=${USER_ID}&startDate=${startDate}&endDate=${endDate}`
-    )
+    apiFetch(`/api/activities?startDate=${startDate}&endDate=${endDate}`)
       .then((response) => {
         if (!response.ok) throw new Error('Erro ao buscar atividades');
         return response.json();
@@ -112,14 +110,10 @@ function WeeklyView() {
     setTogglingId(activity.id);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/activities/${activity.id}/status?userId=${USER_ID}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus }),
-        }
-      );
+      const response = await apiFetch(`/api/activities/${activity.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus }),
+      });
 
       if (!response.ok) throw new Error('Erro ao atualizar status');
 

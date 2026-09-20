@@ -3,6 +3,7 @@ package com.seuprojeto.backend.controller;
 import com.seuprojeto.backend.dto.*;
 import com.seuprojeto.backend.entity.Activity;
 import com.seuprojeto.backend.entity.PendingItem;
+import com.seuprojeto.backend.security.CurrentUser;
 import com.seuprojeto.backend.service.PendingItemService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -22,8 +23,8 @@ public class PendingItemController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PendingItemResponse>> list(@RequestParam Long userId) {
-        List<PendingItemResponse> response = pendingItemService.findAllByUser(userId).stream()
+    public ResponseEntity<List<PendingItemResponse>> list() {
+        List<PendingItemResponse> response = pendingItemService.findAllByUser(CurrentUser.getUserId()).stream()
                 .map(PendingItemResponse::fromEntity)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(response);
@@ -31,6 +32,7 @@ public class PendingItemController {
 
     @PostMapping
     public ResponseEntity<PendingItemResponse> create(@Valid @RequestBody PendingItemRequest request) {
+        request.setUserId(CurrentUser.getUserId());
         PendingItem created = pendingItemService.create(request);
         return ResponseEntity.ok(PendingItemResponse.fromEntity(created));
     }
@@ -38,36 +40,33 @@ public class PendingItemController {
     @PutMapping("/{id}")
     public ResponseEntity<PendingItemResponse> update(
             @PathVariable Long id,
-            @RequestParam Long userId,
             @Valid @RequestBody PendingItemRequest request
     ) {
-        PendingItem updated = pendingItemService.update(id, userId, request);
+        PendingItem updated = pendingItemService.update(id, CurrentUser.getUserId(), request);
         return ResponseEntity.ok(PendingItemResponse.fromEntity(updated));
     }
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<PendingItemResponse> updateStatus(
             @PathVariable Long id,
-            @RequestParam Long userId,
             @Valid @RequestBody StatusUpdateRequest request
     ) {
-        PendingItem updated = pendingItemService.updateStatus(id, userId, request.getStatus());
+        PendingItem updated = pendingItemService.updateStatus(id, CurrentUser.getUserId(), request.getStatus());
         return ResponseEntity.ok(PendingItemResponse.fromEntity(updated));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id, @RequestParam Long userId) {
-        pendingItemService.delete(id, userId);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        pendingItemService.delete(id, CurrentUser.getUserId());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/convert")
     public ResponseEntity<ActivityResponse> convert(
             @PathVariable Long id,
-            @RequestParam Long userId,
             @Valid @RequestBody ConvertPendingItemRequest request
     ) {
-        Activity created = pendingItemService.convertToActivity(id, userId, request);
+        Activity created = pendingItemService.convertToActivity(id, CurrentUser.getUserId(), request);
         return ResponseEntity.ok(ActivityResponse.fromEntity(created));
     }
 }

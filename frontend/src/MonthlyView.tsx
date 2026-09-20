@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatDate } from './dateUtils';
-import { API_URL, USER_ID } from './api';
+import { apiFetch } from './api';
 import ActivityForm, { type Activity } from './ActivityForm';
 
 const WEEKDAY_HEADERS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -90,9 +90,7 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
     const startDate = formatDate(firstDayOfMonth);
     const endDate = formatDate(lastDayOfMonth);
 
-    fetch(
-      `${API_URL}/api/activities?userId=${USER_ID}&startDate=${startDate}&endDate=${endDate}`
-    )
+    apiFetch(`/api/activities?startDate=${startDate}&endDate=${endDate}`)
       .then((response) => {
         if (!response.ok) throw new Error('Erro ao buscar atividades');
         return response.json();
