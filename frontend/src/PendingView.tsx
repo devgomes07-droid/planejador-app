@@ -169,6 +169,14 @@ function PendingView() {
         }
       );
 
+      if (response.status === 409) {
+        notify(
+          'Esse horário já está ocupado por outra atividade. Escolha outro horário.',
+          'error'
+        );
+        return;
+      }
+
       if (!response.ok) throw new Error('Erro ao converter pendência');
 
       setConvertingId(null);
