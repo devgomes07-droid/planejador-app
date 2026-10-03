@@ -30,6 +30,11 @@ function LoginView() {
 
   return (
     <div className="login-page">
+      <div className="login-blob login-blob-1" />
+      <div className="login-blob login-blob-2" />
+      <div className="login-blob login-blob-3" />
+      <div className="login-grid-overlay" />
+
       <svg className="login-bg-icon" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="3" />
         <path d="M16 2v4M8 2v4M3 10h18" />
