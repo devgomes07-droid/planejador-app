@@ -141,11 +141,15 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
     return [...withTime, ...withoutTime];
   }
 
-  function openDay(dateStr: string) {
-    setSelectedDay(dateStr);
-    setPanelDay(dateStr);
-    onSelectDay?.(dateStr);
-  }
+    function openDay(dateStr: string) {
+      setSelectedDay(dateStr);
+      onSelectDay?.(dateStr);
+      if (getActivitiesForDay(dateStr).length === 0) {
+        setFormState({ mode: 'new', date: dateStr });
+      } else {
+        setPanelDay(dateStr);
+      }
+    }
 
   function handleSaved() {
     setFormState(null);
