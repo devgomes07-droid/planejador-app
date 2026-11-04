@@ -20,7 +20,9 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     },
   });
 
-  if (response.status === 401 || response.status === 403) {
+  // Só desloga quando o token é inválido/expirado (401).
+  // 403 e outros erros NÃO devem derrubar a sessão.
+  if (response.status === 401) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.reload();
