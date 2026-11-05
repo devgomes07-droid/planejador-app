@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { apiFetch } from './api';
 import { todayString } from './dateUtils';
 import { useDialog } from './DialogProvider';
+import './ActivityForm.css';
 
 export interface Activity {
   id: number;
@@ -31,6 +33,20 @@ const DURATIONS: { label: string; value: number }[] = [
   { label: '1 h', value: 60 },
   { label: '1h30', value: 90 },
   { label: '2 h', value: 120 },
+];
+
+const TYPES: { value: string; label: string }[] = [
+  { value: 'TASK', label: 'Tarefa' },
+  { value: 'COMMITMENT', label: 'Compromisso' },
+  { value: 'POSSIBILITY', label: 'Possibilidade' },
+];
+
+const PRIORITIES: { value: string; label: string }[] = [
+  { value: '', label: 'Nenhuma' },
+  { value: 'LOW', label: 'Baixa' },
+  { value: 'MEDIUM', label: 'Média' },
+  { value: 'HIGH', label: 'Alta' },
+  { value: 'URGENT', label: 'Urgente' },
 ];
 
 function toMinutes(time: string): number {
@@ -76,9 +92,19 @@ function ActivityForm({
   const [startTime, setStartTime] = useState(activity?.startTime?.slice(0, 5) ?? '');
   const [durationMode, setDurationMode] = useState<DurationMode>(initialDurationMode(activity));
   const [customEnd, setCustomEnd] = useState(activity?.endTime?.slice(0, 5) ?? '');
+  const [showSlots, setShowSlots] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Trava a rolagem da pagina enquanto o formulario esta aberto
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
 
   function computeEnd(): string {
     if (!hasTime || !startTime) return '';
@@ -127,7 +153,7 @@ function ActivityForm({
     if (!title.trim()) return 'Escreva um título para a atividade.';
     if (!date) return 'Escolha uma data.';
     if (hasTime && !startTime) {
-      return 'Escolha o horário de início ou desmarque "Definir horário".';
+      return 'Escolha o horário de início ou desligue "Definir horário".';
     }
     if (hasTime && durationMode === 'custom') {
       if (!customEnd) return 'Informe o horário de fim ou escolha outra duração.';
@@ -245,236 +271,263 @@ function ActivityForm({
     }
   }
 
-  return (
-    <div className="modal-overlay" onClick={() => !saving && onClose()}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{isEditing ? 'Editar Atividade' : 'Nova Atividade'}</h2>
-
-        <div className="form-field">
-          <label htmlFor="af-title">Título *</label>
-          <input
-            id="af-title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            autoFocus
-          />
+  const form = (
+    <div className="af-overlay" onClick={() => !saving && onClose()}>
+      <div
+        className="af-card"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="af-header">
+          <h2>{isEditing ? 'Editar Atividade' : 'Nova Atividade'}</h2>
+          <button className="af-close" onClick={onClose} disabled={saving} aria-label="Fechar">
+            ✕
+          </button>
         </div>
 
-        <div className="form-field">
-          <label htmlFor="af-description">Descrição</label>
-          <textarea
-            id="af-description"
-            rows={2}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
+        <div className="af-body">
+          <div className="af-field">
+            <label className="af-label" htmlFor="af-title">
+              Título
+            </label>
+            <input
+              id="af-title"
+              className="af-input af-title-input"
+              type="text"
+              placeholder="O que você precisa fazer?"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              autoFocus
+            />
+          </div>
 
-        <div className="form-row">
-          <div className="form-field">
-            <label htmlFor="af-date">Data *</label>
+          <div className="af-field">
+            <label className="af-label" htmlFor="af-description">
+              Descrição
+            </label>
+            <textarea
+              id="af-description"
+              className="af-textarea"
+              rows={2}
+              placeholder="Detalhes (opcional)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="af-field">
+            <label className="af-label" htmlFor="af-date">
+              Data
+            </label>
             <input
               id="af-date"
+              className="af-input"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="af-type">Tipo</label>
-            <select id="af-type" value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="TASK">Tarefa</option>
-              <option value="COMMITMENT">Compromisso</option>
-              <option value="POSSIBILITY">Possibilidade</option>
-            </select>
-          </div>
-        </div>
 
-        <label className="form-checkbox">
-          <input
-            type="checkbox"
-            checked={hasTime}
-            onChange={(e) => setHasTime(e.target.checked)}
-          />
-          Definir Horário
-        </label>
-
-        {hasTime && (
-          <div className="time-box">
-            <div className="form-field">
-              <label>Escolha o Horário de Início</label>
-              <div
-                className="chip-row"
-                style={{
-                  maxHeight: 170,
-                  overflowY: 'auto',
-                  padding: 8,
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-sm)',
-                }}
-              >
-                {TIME_SLOTS.map((slot) => {
-                  const busy = isSlotBusy(slot);
-                  return (
-                    <button
-                      key={slot}
-                      type="button"
-                      disabled={busy}
-                      title={busy ? 'Horário ocupado' : undefined}
-                      className={`chip ${startTime === slot ? 'selected' : ''}`}
-                      style={busy ? { textDecoration: 'line-through' } : undefined}
-                      onClick={() => setStartTime(slot)}
-                    >
-                      {slot}
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                Horários riscados já estão ocupados neste dia.
-              </div>
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="af-start">Ou Digite um Horário Exato</label>
-              <input
-                id="af-start"
-                type="time"
-                step={300}
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-
-            <div className="form-field">
-              <label>Duração</label>
-              <div className="chip-row">
+          <div className="af-field">
+            <span className="af-label">Tipo</span>
+            <div className="af-segment">
+              {TYPES.map((t) => (
                 <button
+                  key={t.value}
                   type="button"
-                  className={`chip ${durationMode === 'none' ? 'selected' : ''}`}
-                  onClick={() => setDurationMode('none')}
+                  className={type === t.value ? 'on' : ''}
+                  onClick={() => setType(t.value)}
                 >
-                  Sem Fim
+                  {t.label}
                 </button>
-                {DURATIONS.map((d) => (
-                  <button
-                    key={d.value}
-                    type="button"
-                    className={`chip ${durationMode === d.value ? 'selected' : ''}`}
-                    onClick={() => setDurationMode(d.value)}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className={`chip ${durationMode === 'custom' ? 'selected' : ''}`}
-                  onClick={() => setDurationMode('custom')}
-                >
-                  Outro
-                </button>
-              </div>
-            </div>
-
-            {durationMode === 'custom' && (
-              <div className="form-field">
-                <label htmlFor="af-end">Termina às</label>
-                <input
-                  id="af-end"
-                  type="time"
-                  step={300}
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                />
-              </div>
-            )}
-
-            {startTime && (
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                Resumo: <strong>{startTime}</strong>
-                {endTime ? ` até ${endTime}` : ' (sem horário de fim)'}
-              </div>
-            )}
-
-            {busyActivities.length > 0 && (
-              <div className="busy-list">
-                Horários já ocupados neste dia:
-                <ul>
-                  {busyActivities.map((b) => (
-                    <li key={b.id}>
-                      {b.startTime!.slice(0, 5)}
-                      {b.endTime ? `–${b.endTime.slice(0, 5)}` : ''} — {b.title}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="form-field">
-          <label htmlFor="af-priority">Prioridade (Opcional)</label>
-          <select id="af-priority" value={priority} onChange={(e) => setPriority(e.target.value)}>
-            <option value="">Sem Prioridade</option>
-            <option value="LOW">Baixa</option>
-            <option value="MEDIUM">Média</option>
-            <option value="HIGH">Alta</option>
-            <option value="URGENT">Urgente</option>
-          </select>
-        </div>
-
-        <label className="form-checkbox">
-          <input
-            type="checkbox"
-            checked={highlighted}
-            onChange={(e) => setHighlighted(e.target.checked)}
-          />
-          Destacar no Calendário Mensal
-        </label>
-
-        {formError && <div className="form-error">{formError}</div>}
-
-        {hasConflicts && (
-          <div className="form-error">
-            <strong>Horário indisponível.</strong> Já existe atividade neste horário:
-            <ul>
-              {conflicts.map((c) => (
-                <li key={c.id}>
-                  {c.startTime?.slice(0, 5)}
-                  {c.endTime ? `–${c.endTime.slice(0, 5)}` : ''} — {c.title}
-                </li>
               ))}
-            </ul>
-            Escolha outro horário ou outra duração para salvar.
+            </div>
           </div>
-        )}
 
-        <div className="form-actions">
-          <button className="btn-ghost" onClick={onClose} disabled={saving}>
-            Fechar
-          </button>
-          <button className="btn-primary" onClick={save} disabled={saving || hasConflicts}>
-            {saving ? 'Salvando...' : 'Salvar'}
-          </button>
+          <div className="af-toggle" onClick={() => setHasTime(!hasTime)}>
+            Definir Horário
+            <span className={`af-switch ${hasTime ? 'on' : ''}`} />
+          </div>
+
+          {hasTime && (
+            <div className="af-timebox">
+              <div className="af-row">
+                <div className="af-field">
+                  <label className="af-label" htmlFor="af-start">
+                    Início
+                  </label>
+                  <input
+                    id="af-start"
+                    className="af-input"
+                    type="time"
+                    step={300}
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="af-field">
+                  <span className="af-label">Fim</span>
+                  <input
+                    className="af-input"
+                    type="time"
+                    step={300}
+                    value={durationMode === 'custom' ? customEnd : endTime}
+                    disabled={durationMode !== 'custom'}
+                    onChange={(e) => setCustomEnd(e.target.value)}
+                    placeholder="--:--"
+                  />
+                </div>
+              </div>
+
+              <button type="button" className="af-link" onClick={() => setShowSlots(!showSlots)}>
+                {showSlots ? 'Esconder horários rápidos' : 'Escolher em horários rápidos'}
+              </button>
+
+              {showSlots && (
+                <div className="af-slots">
+                  {TIME_SLOTS.map((slot) => {
+                    const busy = isSlotBusy(slot);
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        disabled={busy}
+                        title={busy ? 'Horário ocupado' : undefined}
+                        className={`af-chip ${startTime === slot ? 'on' : ''}`}
+                        onClick={() => setStartTime(slot)}
+                      >
+                        {slot}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="af-field">
+                <span className="af-label">Duração</span>
+                <div className="af-chips">
+                  <button
+                    type="button"
+                    className={`af-chip ${durationMode === 'none' ? 'on' : ''}`}
+                    onClick={() => setDurationMode('none')}
+                  >
+                    Sem Fim
+                  </button>
+                  {DURATIONS.map((d) => (
+                    <button
+                      key={d.value}
+                      type="button"
+                      className={`af-chip ${durationMode === d.value ? 'on' : ''}`}
+                      onClick={() => setDurationMode(d.value)}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className={`af-chip ${durationMode === 'custom' ? 'on' : ''}`}
+                    onClick={() => setDurationMode('custom')}
+                  >
+                    Outro
+                  </button>
+                </div>
+              </div>
+
+              {startTime && (
+                <div className="af-summary">
+                  Resumo: <strong>{startTime}</strong>
+                  {endTime ? ` até ${endTime}` : ' (sem horário de fim)'}
+                </div>
+              )}
+
+              {busyActivities.length > 0 && (
+                <div className="af-summary">
+                  Já ocupado neste dia:
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                    {busyActivities.map((b) => (
+                      <li key={b.id}>
+                        {b.startTime!.slice(0, 5)}
+                        {b.endTime ? `–${b.endTime.slice(0, 5)}` : ''} — {b.title}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="af-field">
+            <span className="af-label">Prioridade</span>
+            <div className="af-chips">
+              {PRIORITIES.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  className={`af-chip ${priority === p.value ? 'on' : ''}`}
+                  onClick={() => setPriority(p.value)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="af-toggle" onClick={() => setHighlighted(!highlighted)}>
+            Destacar no Calendário Mensal
+            <span className={`af-switch ${highlighted ? 'on' : ''}`} />
+          </div>
+
+          {formError && <div className="af-error">{formError}</div>}
+
+          {hasConflicts && (
+            <div className="af-error">
+              <strong>Horário indisponível.</strong> Já existe atividade neste horário:
+              <ul>
+                {conflicts.map((c) => (
+                  <li key={c.id}>
+                    {c.startTime?.slice(0, 5)}
+                    {c.endTime ? `–${c.endTime.slice(0, 5)}` : ''} — {c.title}
+                  </li>
+                ))}
+              </ul>
+              Escolha outro horário ou outra duração para salvar.
+            </div>
+          )}
         </div>
 
-        {isEditing && (
-          <div className="form-actions-secondary">
-            {activity!.status !== 'CANCELLED' && (
-              <button className="btn-small" onClick={cancelActivity} disabled={saving}>
-                Cancelar Atividade
-              </button>
-            )}
-            <button className="btn-small btn-danger" onClick={deleteActivity} disabled={saving}>
-              Excluir
+        <div className="af-footer">
+          <div className="af-footer-main">
+            <button className="af-btn af-btn-ghost" onClick={onClose} disabled={saving}>
+              Fechar
+            </button>
+            <button
+              className="af-btn af-btn-primary"
+              onClick={save}
+              disabled={saving || hasConflicts}
+            >
+              {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
-        )}
+
+          {isEditing && (
+            <div className="af-footer-secondary">
+              {activity!.status !== 'CANCELLED' && (
+                <button className="af-text-btn" onClick={cancelActivity} disabled={saving}>
+                  Cancelar Atividade
+                </button>
+              )}
+              <button className="af-text-btn danger" onClick={deleteActivity} disabled={saving}>
+                Excluir
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
+
+  return createPortal(form, document.body);
 }
 
 export default ActivityForm;
