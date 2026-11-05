@@ -225,15 +225,17 @@ select:focus {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   margin: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
+  justify-content: flex-start;
+  padding: calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
   background: #16263d;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   z-index: 9999;
 }
 
@@ -272,6 +274,12 @@ select:focus {
   background: radial-gradient(circle, #8fb5e8 0%, transparent 70%);
   opacity: 0.35;
   animation: blobMove3 12s ease-in-out infinite;
+}
+
+/* no login o fundo fica parado enquanto o conteúdo rola */
+.login-page .login-blob,
+.login-page .login-grid-overlay {
+  position: fixed;
 }
 
 .login-grid-overlay {
@@ -357,6 +365,7 @@ select:focus {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-top: auto;
   margin-bottom: 28px;
   color: white;
   animation: fadeIn 0.5s ease-out;
@@ -390,6 +399,8 @@ select:focus {
   z-index: 2;
   width: 100%;
   max-width: 400px;
+  flex-shrink: 0;
+  margin-bottom: auto;
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: 0 30px 70px rgba(10, 20, 35, 0.5), 0 0 0 1px rgba(255,255,255,0.06);
@@ -472,7 +483,7 @@ select:focus {
 .login-input-wrap input {
   width: 100%;
   padding: 14px 16px 14px 42px;
-  font-size: 15px;
+  font-size: 16px; /* 16px evita zoom automático no iPhone */
   border-radius: 10px;
   border: 1.5px solid var(--color-border);
   background: var(--color-surface-alt);
@@ -585,8 +596,26 @@ select:focus {
 }
 
 @media (max-width: 480px) {
+  .login-brand {
+    margin-bottom: 18px;
+  }
+
   .login-card {
-    padding: 32px 24px 28px;
+    padding: 28px 20px 24px;
     border-radius: var(--radius-md);
+  }
+
+  .login-card:hover {
+    box-shadow: 0 30px 70px rgba(10, 20, 35, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+
+  .login-icon {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 16px;
+  }
+
+  .login-subtitle {
+    margin-bottom: 20px;
   }
 }
