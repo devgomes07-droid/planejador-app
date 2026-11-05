@@ -8,6 +8,7 @@ import com.seuprojeto.backend.security.CurrentUser;
 import com.seuprojeto.backend.service.ActivityService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -51,9 +52,8 @@ public class ActivityController {
 
     @PostMapping
     public ResponseEntity<ActivityResponse> create(@Valid @RequestBody ActivityRequest request) {
-        request.setUserId(CurrentUser.getUserId());
-        Activity created = activityService.create(request);
-        return ResponseEntity.ok(ActivityResponse.fromEntity(created));
+        Activity created = activityService.create(CurrentUser.getUserId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ActivityResponse.fromEntity(created));
     }
 
     @PutMapping("/{id}")

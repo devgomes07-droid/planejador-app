@@ -6,6 +6,7 @@ import com.seuprojeto.backend.enums.ActivityStatus;
 import com.seuprojeto.backend.exception.ScheduleConflictException;
 import com.seuprojeto.backend.repository.ActivityRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -21,36 +22,40 @@ public class ActivityService {
         this.activityRepository = activityRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<Activity> findByPeriod(Long userId, LocalDate startDate, LocalDate endDate) {
         return activityRepository.findByUserIdAndDateBetween(userId, startDate, endDate);
     }
 
+    @Transactional(readOnly = true)
     public List<Activity> findAllByUser(Long userId) {
         return activityRepository.findByUserId(userId);
     }
 
+    /**
+     * Busca a atividade garantindo que ela pertence ao usuário.
+     * Atividade de outro usuário responde igual a "não existe" (404),
+     * para não revelar que o id existe.
+     */
+    @Transactional(readOnly = true)
     public Activity findByIdAndUser(Long id, Long userId) {
-        Activity activity = activityRepository.findById(id)
+        return activityRepository.findById(id)
+                .filter(activity -> activity.getUserId().equals(userId))
                 .orElseThrow(() -> new NoSuchElementException("Atividade não encontrada"));
-
-        if (!activity.getUserId().equals(userId)) {
-            throw new SecurityException("Acesso negado a esta atividade");
-        }
-
-        return activity;
     }
 
-    public Activity create(ActivityRequest request) {
+    @Transactional
+    public Activity create(Long userId, ActivityRequest request) {
         validateTimes(request.getStartTime(), request.getEndTime());
         checkConflict(
-                request.getUserId(),
+                userId,
                 request.getDate(),
                 request.getStartTime(),
                 request.getEndTime(),
                 null
         );
 
-        Activity activity = new Activity(request.getUserId(), request.getTitle(), request.getType());
+        Activity activity = new Activity(userId, request.getTitle(), request.getType());
         activity.setDescription(request.getDescription());
         activity.setDate(request.getDate());
         activity.setStartTime(request.getStartTime());
@@ -64,6 +69,7 @@ public class ActivityService {
         return activityRepository.save(activity);
     }
 
+    @Transactional
     public Activity update(Long id, Long userId, ActivityRequest request) {
         Activity activity = findByIdAndUser(id, userId);
 
@@ -95,6 +101,7 @@ public class ActivityService {
         return activityRepository.save(activity);
     }
 
+    @Transactional
     public Activity updateStatus(Long id, Long userId, ActivityStatus newStatus) {
         Activity activity = findByIdAndUser(id, userId);
 
@@ -110,10 +117,10 @@ public class ActivityService {
         }
 
         activity.setStatus(newStatus);
-        activity.setHighlighted(activity.isHighlighted());
         return activityRepository.save(activity);
     }
 
+    @Transactional
     public void delete(Long id, Long userId) {
         Activity activity = findByIdAndUser(id, userId);
         activityRepository.delete(activity);
