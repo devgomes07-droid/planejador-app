@@ -17,12 +17,43 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// O plano free do Render pode levar ~1 min para acordar
+const REQUEST_TIMEOUT_MS = 75_000;
+
+function readStoredUser(): AuthUser | null {
+  try {
+    const stored = localStorage.getItem('user');
+    return stored ? (JSON.parse(stored) as AuthUser) : null;
+  } catch {
+    localStorage.removeItem('user');
+    return null;
+  }
+}
+
+async function postAuth(path: string, body: unknown): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('O servidor demorou demais para responder. Tente de novo em instantes.');
+    }
+    throw new Error('Sem conexão com o servidor. Verifique sua internet e tente de novo.');
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [user, setUser] = useState<AuthUser | null>(readStoredUser);
 
   useEffect(() => {
     if (token) {
@@ -40,19 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  async function login(email: string, password: string) {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (!response.ok) {
-      throw new Error('E-mail ou senha inválidos');
-    }
-
-    const data = await response.json();
-    const authUser = { userId: data.userId, name: data.name, email: data.email };
+  function startSession(data: { token: string; userId: number; name: string; email: string }) {
+    const authUser: AuthUser = { userId: data.userId, name: data.name, email: data.email };
 
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(authUser));
@@ -61,28 +81,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(authUser);
   }
 
+  async function login(email: string, password: string) {
+    const response = await postAuth('/api/auth/login', { email, password });
+
+    if (!response.ok) {
+      if (response.status >= 500) {
+        throw new Error('O servidor está com problemas. Tente de novo em instantes.');
+      }
+      throw new Error('E-mail ou senha incorretos.');
+    }
+
+    startSession(await response.json());
+  }
+
   async function register(name: string, email: string, password: string) {
-    const response = await fetch(`${API_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
-    });
+    const response = await postAuth('/api/auth/register', { name, email, password });
 
     if (!response.ok) {
       if (response.status === 409) {
-        throw new Error('Este e-mail já está cadastrado');
+        throw new Error('Este e-mail já está cadastrado. Tente entrar.');
       }
-      throw new Error('Não foi possível criar a conta');
+      if (response.status === 400) {
+        throw new Error('Confira os dados informados e tente de novo.');
+      }
+      if (response.status >= 500) {
+        throw new Error('O servidor está com problemas. Tente de novo em instantes.');
+      }
+      throw new Error('Não foi possível criar a conta.');
     }
 
-    const data = await response.json();
-    const authUser = { userId: data.userId, name: data.name, email: data.email };
-
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(authUser));
-
-    setToken(data.token);
-    setUser(authUser);
+    startSession(await response.json());
   }
 
   function logout() {

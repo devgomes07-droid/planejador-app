@@ -1,0 +1,80 @@
+/* Olhinho de mostrar/ocultar senha */
+.login-input-wrap input.login-input-eye {
+  padding-right: 48px;
+}
+
+.login-input-wrap .login-eye {
+  position: absolute;
+  right: 6px;
+  width: 38px;
+  height: 38px;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 10px;
+  color: var(--color-text-muted) !important;
+}
+
+.login-input-wrap .login-eye:hover:not(:disabled) {
+  color: var(--color-primary) !important;
+  background: rgba(74, 111, 165, 0.1) !important;
+}
+
+.login-input-wrap .login-eye svg,
+.login-input-wrap:focus-within .login-eye svg {
+  position: static;
+  left: auto;
+  width: 19px;
+  height: 19px;
+  stroke: currentColor;
+  pointer-events: none;
+}
+
+/* Erro por campo */
+.login-input-wrap input.invalid {
+  border-color: var(--color-danger);
+  background: #fff8f8;
+}
+
+.login-input-wrap input.invalid:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 4px rgba(181, 84, 74, 0.14);
+}
+
+.login-field-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-danger);
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Aviso de servidor acordando */
+.login-waking {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 11px 13px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-primary-dark);
+  background: #eaf1fc;
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.login-waking .login-spinner {
+  flex-shrink: 0;
+  margin-top: 2px;
+  border-color: rgba(74, 111, 165, 0.3);
+  border-top-color: var(--color-primary);
+}
+
+.login-error {
+  line-height: 1.35;
+}
