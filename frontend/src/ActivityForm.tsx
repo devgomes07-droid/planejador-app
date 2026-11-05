@@ -177,7 +177,11 @@ function ActivityForm({
         return;
       }
 
-      if (!response.ok) throw new Error('Erro ao salvar atividade');
+      if (!response.ok) {
+        setFormError('O servidor recusou os dados desta atividade. Confira os campos e tente de novo.');
+        setSaving(false);
+        return;
+      }
 
       notify(isEditing ? 'Atividade atualizada.' : 'Atividade criada.', 'success');
       onSaved();
@@ -244,7 +248,7 @@ function ActivityForm({
   return (
     <div className="modal-overlay" onClick={() => !saving && onClose()}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{isEditing ? 'Editar atividade' : 'Nova atividade'}</h2>
+        <h2>{isEditing ? 'Editar Atividade' : 'Nova Atividade'}</h2>
 
         <div className="form-field">
           <label htmlFor="af-title">Título *</label>
@@ -293,13 +297,13 @@ function ActivityForm({
             checked={hasTime}
             onChange={(e) => setHasTime(e.target.checked)}
           />
-          Definir horário
+          Definir Horário
         </label>
 
         {hasTime && (
           <div className="time-box">
             <div className="form-field">
-              <label>Escolha o horário de início</label>
+              <label>Escolha o Horário de Início</label>
               <div
                 className="chip-row"
                 style={{
@@ -334,7 +338,7 @@ function ActivityForm({
             </div>
 
             <div className="form-field">
-              <label htmlFor="af-start">Ou digite um horário exato</label>
+              <label htmlFor="af-start">Ou Digite um Horário Exato</label>
               <input
                 id="af-start"
                 type="time"
@@ -352,7 +356,7 @@ function ActivityForm({
                   className={`chip ${durationMode === 'none' ? 'selected' : ''}`}
                   onClick={() => setDurationMode('none')}
                 >
-                  Sem fim
+                  Sem Fim
                 </button>
                 {DURATIONS.map((d) => (
                   <button
@@ -411,9 +415,9 @@ function ActivityForm({
         )}
 
         <div className="form-field">
-          <label htmlFor="af-priority">Prioridade (opcional)</label>
+          <label htmlFor="af-priority">Prioridade (Opcional)</label>
           <select id="af-priority" value={priority} onChange={(e) => setPriority(e.target.value)}>
-            <option value="">Sem prioridade</option>
+            <option value="">Sem Prioridade</option>
             <option value="LOW">Baixa</option>
             <option value="MEDIUM">Média</option>
             <option value="HIGH">Alta</option>
@@ -427,7 +431,7 @@ function ActivityForm({
             checked={highlighted}
             onChange={(e) => setHighlighted(e.target.checked)}
           />
-          Destacar no calendário mensal
+          Destacar no Calendário Mensal
         </label>
 
         {formError && <div className="form-error">{formError}</div>}
@@ -460,7 +464,7 @@ function ActivityForm({
           <div className="form-actions-secondary">
             {activity!.status !== 'CANCELLED' && (
               <button className="btn-small" onClick={cancelActivity} disabled={saving}>
-                Cancelar atividade
+                Cancelar Atividade
               </button>
             )}
             <button className="btn-small btn-danger" onClick={deleteActivity} disabled={saving}>

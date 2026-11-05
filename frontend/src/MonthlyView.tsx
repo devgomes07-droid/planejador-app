@@ -11,7 +11,7 @@ const MONTH_NAMES = [
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pendente',
-  IN_PROGRESS: 'Em andamento',
+  IN_PROGRESS: 'Em Andamento',
   COMPLETED: 'Concluído',
   CANCELLED: 'Cancelado',
   POSTPONED: 'Adiado',
@@ -105,6 +105,15 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
       });
   }, [currentMonth, currentYear, reloadKey]);
 
+  // Recarrega quando outra tela (ex.: Semanal) altera atividades
+  useEffect(() => {
+    function onChanged() {
+      setReloadKey((k) => k + 1);
+    }
+    window.addEventListener('activities-changed', onChanged);
+    return () => window.removeEventListener('activities-changed', onChanged);
+  }, []);
+
   function goToPreviousMonth() {
     if (currentMonth === 0) {
       setCurrentMonth(11);
@@ -141,19 +150,20 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
     return [...withTime, ...withoutTime];
   }
 
-    function openDay(dateStr: string) {
-      setSelectedDay(dateStr);
-      onSelectDay?.(dateStr);
-      if (getActivitiesForDay(dateStr).length === 0) {
-        setFormState({ mode: 'new', date: dateStr });
-      } else {
-        setPanelDay(dateStr);
-      }
+  function openDay(dateStr: string) {
+    setSelectedDay(dateStr);
+    onSelectDay?.(dateStr);
+    if (getActivitiesForDay(dateStr).length === 0) {
+      setFormState({ mode: 'new', date: dateStr });
+    } else {
+      setPanelDay(dateStr);
     }
+  }
 
   function handleSaved() {
     setFormState(null);
     setReloadKey((k) => k + 1);
+    window.dispatchEvent(new Event('activities-changed'));
   }
 
   function buildCalendarGrid(): (Date | null)[] {
@@ -271,7 +281,11 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    color: 'var(--color-text-primary)',
+                    textDecoration: highlight.status === 'COMPLETED' ? 'line-through' : 'none',
+                    color:
+                      highlight.status === 'COMPLETED'
+                        ? 'var(--color-text-muted)'
+                        : 'var(--color-text-primary)',
                   }}
                 >
                   {highlight.title}
@@ -295,7 +309,7 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
 
             {panelActivities.length === 0 && (
               <p style={{ color: 'var(--color-text-muted)', fontSize: 14, margin: '0 0 16px 0' }}>
-                Nenhuma atividade neste dia.
+                Nenhuma Atividade Neste Dia.
               </p>
             )}
 
@@ -364,7 +378,7 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
                 className="btn-primary"
                 onClick={() => setFormState({ mode: 'new', date: panelDay })}
               >
-                + Nova atividade
+                + Nova Atividade
               </button>
             </div>
           </div>

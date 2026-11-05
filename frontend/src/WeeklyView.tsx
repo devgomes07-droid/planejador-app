@@ -27,7 +27,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pendente',
-  IN_PROGRESS: 'Em andamento',
+  IN_PROGRESS: 'Em Andamento',
   COMPLETED: 'Concluído',
   CANCELLED: 'Cancelado',
   POSTPONED: 'Adiado',
@@ -87,6 +87,15 @@ function WeeklyView() {
       });
   }, [weekStart, reloadKey]);
 
+  // Recarrega quando outra tela (ex.: Mensal) altera atividades
+  useEffect(() => {
+    function onChanged() {
+      setReloadKey((k) => k + 1);
+    }
+    window.addEventListener('activities-changed', onChanged);
+    return () => window.removeEventListener('activities-changed', onChanged);
+  }, []);
+
   function goToPreviousWeek() {
     const newStart = new Date(weekStart);
     newStart.setDate(weekStart.getDate() - 7);
@@ -119,6 +128,7 @@ function WeeklyView() {
 
       const updated: Activity = await response.json();
       setActivities((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+      window.dispatchEvent(new Event('activities-changed'));
     } catch (err) {
       notify(
         'Não conseguimos atualizar esta atividade. Verifique sua conexão e tente novamente.',
@@ -132,6 +142,7 @@ function WeeklyView() {
   function handleSaved() {
     setFormState(null);
     setReloadKey((k) => k + 1);
+    window.dispatchEvent(new Event('activities-changed'));
   }
 
   function getDayActivities(date: Date): { withTime: Activity[]; withoutTime: Activity[] } {
@@ -249,7 +260,7 @@ function WeeklyView() {
             className="btn-primary"
             onClick={() => setFormState({ mode: 'new', date: todayStr })}
           >
-            + Nova atividade
+            + Nova Atividade
           </button>
         </div>
       </div>
@@ -294,7 +305,7 @@ function WeeklyView() {
                 <h3 style={{ margin: 0, color: 'var(--color-text-primary)', fontSize: 15 }}>
                   {dayName.toUpperCase()} — {formatDisplayDate(dayDate)}
                   {isToday && (
-                    <span style={{ color: 'var(--color-primary)', fontWeight: 400 }}> (hoje)</span>
+                    <span style={{ color: 'var(--color-primary)', fontWeight: 400 }}> (Hoje)</span>
                   )}
                 </h3>
                 <button
@@ -307,7 +318,7 @@ function WeeklyView() {
 
               {isEmpty && (
                 <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: 0 }}>
-                  Nenhuma atividade
+                  Nenhuma Atividade
                 </p>
               )}
 
@@ -315,7 +326,7 @@ function WeeklyView() {
 
               {withoutTime.length > 0 && (
                 <>
-                  <div className="section-label">Sem horário definido</div>
+                  <div className="section-label">Sem Horário Definido</div>
                   {withoutTime.map(renderActivity)}
                 </>
               )}
