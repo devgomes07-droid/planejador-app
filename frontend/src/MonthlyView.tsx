@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { formatDate } from './dateUtils';
 import { apiFetch } from './api';
 import ActivityForm, { type Activity } from './ActivityForm';
+import './DayPanel.css';
 
 const WEEKDAY_HEADERS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const MONTH_NAMES = [
@@ -27,6 +29,11 @@ type FormState =
   | { mode: 'new'; date: string }
   | { mode: 'edit'; activity: Activity }
   | null;
+
+function capitalize(text: string): string {
+  const trimmed = text.trim();
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
 
 function pickHighlight(dayActivities: Activity[]): Activity | null {
   const active = dayActivities.filter((a) => a.status !== 'CANCELLED');
@@ -55,7 +62,7 @@ function formatLongDate(dateStr: string): string {
     day: 'numeric',
     month: 'long',
   });
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return capitalize(text);
 }
 
 function timeLabel(activity: Activity): string | null {
@@ -113,6 +120,16 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
     window.addEventListener('activities-changed', onChanged);
     return () => window.removeEventListener('activities-changed', onChanged);
   }, []);
+
+  // Trava a rolagem da pagina enquanto o painel do dia esta aberto
+  useEffect(() => {
+    if (!panelDay) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [panelDay]);
 
   function goToPreviousMonth() {
     if (currentMonth === 0) {
@@ -191,6 +208,93 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
   const grid = buildCalendarGrid();
   const todayStr = formatDate(today);
   const panelActivities = panelDay ? getSortedDayActivities(panelDay) : [];
+
+  const panel =
+    panelDay !== null ? (
+      <div className="dp-overlay" onClick={() => setPanelDay(null)}>
+        <div
+          className="dp-card"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="dp-header">
+            <div className="dp-header-text">
+              <h2>{formatLongDate(panelDay)}</h2>
+              <span>
+                {panelActivities.length === 0
+                  ? 'Nenhuma atividade'
+                  : panelActivities.length === 1
+                    ? '1 atividade'
+                    : `${panelActivities.length} atividades`}
+              </span>
+            </div>
+            <button
+              className="dp-close"
+              onClick={() => setPanelDay(null)}
+              aria-label="Fechar"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="dp-body">
+            {panelActivities.length === 0 && (
+              <p className="dp-empty">Nenhuma atividade neste dia.</p>
+            )}
+
+            {panelActivities.map((activity) => {
+              const label = timeLabel(activity);
+              const struck = activity.status === 'COMPLETED' || activity.status === 'CANCELLED';
+
+              return (
+                <div
+                  key={activity.id}
+                  className={`dp-item dp-type-${activity.type} ${
+                    activity.status === 'CANCELLED' ? 'dp-cancelled' : ''
+                  }`}
+                >
+                  <div className="dp-item-main">
+                    {label && <span className="dp-time">{label}</span>}
+                    <span
+                      className={`dp-title ${struck ? 'dp-struck' : ''} ${
+                        activity.status === 'COMPLETED' ? 'dp-done' : ''
+                      } ${activity.highlighted ? 'dp-star' : ''}`}
+                    >
+                      {capitalize(activity.title)}
+                    </span>
+                    <div className="dp-meta">
+                      <span className="dp-chip">{TYPE_LABELS[activity.type]}</span>
+                      <span className={`dp-chip dp-status-${activity.status}`}>
+                        {STATUS_LABELS[activity.status]}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    className="dp-edit"
+                    onClick={() => setFormState({ mode: 'edit', activity })}
+                  >
+                    Editar
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="dp-footer">
+            <button className="dp-btn dp-btn-ghost" onClick={() => setPanelDay(null)}>
+              Fechar
+            </button>
+            <button
+              className="dp-btn dp-btn-primary"
+              onClick={() => setFormState({ mode: 'new', date: panelDay })}
+            >
+              + Nova Atividade
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null;
 
   return (
     <div className="app-container">
@@ -288,7 +392,7 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
                         : 'var(--color-text-primary)',
                   }}
                 >
-                  {highlight.title}
+                  {capitalize(highlight.title)}
                 </div>
               )}
 
@@ -302,88 +406,7 @@ function MonthlyView({ onSelectDay }: MonthlyViewProps) {
         })}
       </div>
 
-      {panelDay && (
-        <div className="modal-overlay" onClick={() => setPanelDay(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{formatLongDate(panelDay)}</h2>
-
-            {panelActivities.length === 0 && (
-              <p style={{ color: 'var(--color-text-muted)', fontSize: 14, margin: '0 0 16px 0' }}>
-                Nenhuma Atividade Neste Dia.
-              </p>
-            )}
-
-            {panelActivities.map((activity) => {
-              const label = timeLabel(activity);
-              const struck = activity.status === 'COMPLETED' || activity.status === 'CANCELLED';
-
-              return (
-                <div
-                  key={activity.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 0',
-                    borderBottom: '1px solid var(--color-surface-alt)',
-                    opacity: activity.status === 'CANCELLED' ? 0.5 : 1,
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        textDecoration: struck ? 'line-through' : 'none',
-                        color:
-                          activity.status === 'COMPLETED'
-                            ? 'var(--color-text-muted)'
-                            : 'var(--color-text-primary)',
-                        fontWeight: activity.highlighted ? 600 : 400,
-                      }}
-                    >
-                      {label ? `${label} — ${activity.title}` : activity.title}
-                      {activity.type === 'POSSIBILITY' && (
-                        <span
-                          style={{
-                            marginLeft: 8,
-                            fontSize: 11,
-                            padding: '2px 6px',
-                            border: '1px dashed var(--color-text-muted)',
-                            borderRadius: 'var(--radius-sm)',
-                            color: 'var(--color-text-secondary)',
-                          }}
-                        >
-                          Possível
-                        </span>
-                      )}
-                    </div>
-                    <small style={{ color: 'var(--color-text-secondary)' }}>
-                      {TYPE_LABELS[activity.type]} · {STATUS_LABELS[activity.status]}
-                    </small>
-                  </div>
-                  <button
-                    className="btn-small"
-                    onClick={() => setFormState({ mode: 'edit', activity })}
-                  >
-                    Editar
-                  </button>
-                </div>
-              );
-            })}
-
-            <div className="form-actions" style={{ marginTop: 16 }}>
-              <button className="btn-ghost" onClick={() => setPanelDay(null)}>
-                Fechar
-              </button>
-              <button
-                className="btn-primary"
-                onClick={() => setFormState({ mode: 'new', date: panelDay })}
-              >
-                + Nova Atividade
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {panel && createPortal(panel, document.body)}
 
       {formState && (
         <ActivityForm

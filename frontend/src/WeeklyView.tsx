@@ -6,6 +6,11 @@ import { useDialog } from './DialogProvider';
 
 const DAYS_OF_WEEK = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 
+function capitalize(text: string): string {
+  const trimmed = text.trim();
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
 function getMondayOfWeek(date: Date): Date {
   const day = date.getDay();
   const diff = day === 0 ? -6 : 1 - day;
@@ -172,6 +177,8 @@ function WeeklyView() {
         : activity.startTime.slice(0, 5)
       : null;
 
+    const title = capitalize(activity.title);
+
     return (
       <div
         key={activity.id}
@@ -204,7 +211,7 @@ function WeeklyView() {
               fontWeight: activity.highlighted ? 600 : 400,
             }}
           >
-            {timeLabel ? `${timeLabel} — ${activity.title}` : activity.title}
+            {timeLabel ? `${timeLabel} — ${title}` : title}
           </span>
           {activity.type === 'POSSIBILITY' && (
             <span
